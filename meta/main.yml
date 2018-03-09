@@ -1,5 +1,6 @@
 ---
-dependencies: []
+dependencies:
+  - { role: phansible.php }
 
 galaxy_info:
   author: The Phansible Team & Contributors
