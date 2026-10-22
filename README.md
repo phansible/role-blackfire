@@ -1,6 +1,6 @@
 # Phansible Role: Blackfire
 
-[![Build Status](https://travis-ci.org/phansible/role-blackfire.svg?branch=master)](https://travis-ci.org/phansible/role-blackfire)
+[![CI](https://github.com/phansible/role-blackfire/actions/workflows/ci.yml/badge.svg)](https://github.com/phansible/role-blackfire/actions/workflows/ci.yml)
 
 An Ansible Role that installs [Blackfire](https://blackfire.io/) on Ubuntu specifically created with [Phansible](http://phansible.com/) in mind.
 
