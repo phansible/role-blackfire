@@ -1,16 +1,21 @@
 ---
-dependencies:
-  - { role: phansible.php }
+dependencies: []
 
 galaxy_info:
   author: The Phansible Team & Contributors
-  description: An Ansible Role that installs Blackfire on Ubuntu specifically created with Phansible in mind.
+  description: An Ansible Role that installs the Blackfire agent and PHP probe on Linux servers specifically created with Phansible in mind.
   license: MIT
-  min_ansible_version: 2.4
+  min_ansible_version: 2.15
   platforms:
   - name: Ubuntu
     versions:
-    - trusty
-    - xenial
+    - jammy
+    - noble
+    - resolute
+  - name: Debian
+    versions:
+    - bookworm
+    - trixie
   galaxy_tags:
+    - development
     - web

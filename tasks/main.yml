@@ -1,23 +1,62 @@
 ---
-- name: Add Blackfire GPG key
-  apt_key: url=https://packagecloud.io/gpg.key state=present
+- name: Install repository prerequisites
+  become: yes
+  apt:
+    pkg: ca-certificates
+    update_cache: yes
+    cache_valid_time: 3600
 
-- name: add Blackfire repo
-  apt_repository: repo='deb http://packages.blackfire.io/debian any main' state=present update_cache=yes
+- name: Ensure apt keyrings directory exists
+  become: yes
+  file: path=/etc/apt/keyrings state=directory mode=0755
 
-- name: Install Blackfire Agent
-  apt: pkg=blackfire-agent state=latest
+- name: Add Blackfire repository key
+  become: yes
+  get_url:
+    url: https://packages.blackfire.io/gpg.key
+    dest: /etc/apt/keyrings/blackfire.asc
+    mode: '0644'
+    force: no
 
-- name: Set server ID
-  lineinfile: dest=/etc/blackfire/agent
-              regexp='server-id='
-              line='server-id={{ blackfire_server_id }}'
+- name: Add Blackfire repository
+  become: yes
+  deb822_repository:
+    name: blackfire
+    uris: https://packages.blackfire.io/debian
+    suites: any
+    components: main
+    signed_by: /etc/apt/keyrings/blackfire.asc
+    install_python_debian: yes
+  register: blackfire_repo
 
-- name: Set server token
-  lineinfile: dest=/etc/blackfire/agent
-              regexp='server-token='
-              line='server-token={{ blackfire_server_token }}'
+- name: Update packages database for the Blackfire repository
+  become: yes
+  apt: update_cache=yes
+  when: blackfire_repo is changed
+
+- name: Install Blackfire agent and PHP probe
+  become: yes
+  apt:
+    pkg: [blackfire, blackfire-php]
+    state: latest
+  notify: restart php-fpm
+
+- name: Configure Blackfire agent credentials
+  become: yes
+  ini_file:
+    path: /etc/blackfire/agent
+    section: blackfire
+    option: "{{ item.key }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+  loop:
+    - { key: server-id, value: "{{ blackfire_server_id }}" }
+    - { key: server-token, value: "{{ blackfire_server_token }}" }
+  no_log: true
+  when: blackfire_server_id | length > 0 and blackfire_server_token | length > 0
   notify: restart blackfire-agent
 
-- name: Install Blackfire PHP Probe
-  apt: pkg=blackfire-php state=latest
+- name: Ensure Blackfire agent is started
+  become: yes
+  service: name=blackfire-agent enabled=yes state=started
+  when: blackfire_server_id | length > 0 and blackfire_server_token | length > 0
