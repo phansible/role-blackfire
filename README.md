@@ -2,23 +2,43 @@
 
 [![CI](https://github.com/phansible/role-blackfire/actions/workflows/ci.yml/badge.svg)](https://github.com/phansible/role-blackfire/actions/workflows/ci.yml)
 
-An Ansible Role that installs [Blackfire](https://blackfire.io/) on Ubuntu specifically created with [Phansible](http://phansible.com/) in mind.
+An Ansible Role that installs the [Blackfire](https://blackfire.io/) agent and PHP probe from the official Blackfire apt repository, specifically created with [Phansible](http://phansible.com/) in mind.
 
 ## Requirements
 
-// TODO
+- Ubuntu 22.04, 24.04, 26.04 or Debian 12, 13
+- Ansible >= 2.15
+- PHP installed by [role-php](https://github.com/phansible/role-php) earlier in the same play (its `restart php-fpm` handler is used)
 
 ## Role Variables
 
-// TODO
+```yaml
+blackfire_server_id: ''
+blackfire_server_token: ''
+```
+
+- `blackfire_server_id` (default `''`): server ID from your Blackfire account.
+- `blackfire_server_token` (default `''`): server token from your Blackfire account.
+
+The agent is configured and started only when both are set. Keep them in Ansible Vault or another secret store, not in plain text.
 
 ## Dependencies
 
-// TODO
+[role-php](https://github.com/phansible/role-php), listed before this role in the play.
 
 ## Example Playbook
 
-// TODO
+```yaml
+- hosts: all
+  become: yes
+  vars:
+    php_version: "8.4"
+    blackfire_server_id: "{{ vault_blackfire_server_id }}"
+    blackfire_server_token: "{{ vault_blackfire_server_token }}"
+  roles:
+    - role-php
+    - role-blackfire
+```
 
 ## License
 

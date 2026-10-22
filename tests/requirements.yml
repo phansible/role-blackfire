@@ -1,0 +1,5 @@
+---
+- name: role-php
+  src: https://github.com/phansible/role-php.git
+  scm: git
+  version: master

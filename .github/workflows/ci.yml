@@ -7,8 +7,16 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['ubuntu:22.04', 'ubuntu:24.04', 'ubuntu:26.04', 'debian:12', 'debian:13']
+        php: ['8.2', '8.3', '8.4', '8.5']
+    name: ${{ matrix.image }} / php ${{ matrix.php }}
     env:
-      PLAYBOOK: test.yml
+      ANSIBLE_ROLES_PATH: ..
+      ANSIBLE_FORCE_COLOR: '1'
+      PLAYBOOK: ansible-playbook -i test, -c community.docker.docker tests/test.yml -e php_version=${{ matrix.php }}
     steps:
       - uses: actions/checkout@v4
 
@@ -16,24 +24,41 @@ jobs:
         with:
           python-version: '3.13' # newest 3.x breaks ansible-core
 
-      # Travis VMs answered yes to apt prompts by default
-      - name: Configure apt like Travis
-        run: echo 'APT::Get::Assume-Yes "true";' | sudo tee /etc/apt/apt.conf.d/90assume-yes
+      - name: Install Ansible
+        run: pip install ansible
 
-      - name: 'Install Ansible'
-        run: 'pip install ansible'
+      - name: Install role dependencies
+        run: ansible-galaxy install -r tests/requirements.yml -p ..
 
-      - name: 'Add ansible.cfg to pick up roles path'
-        run: '{ echo ''[defaults]''; echo ''roles_path = ../''; } >> ansible.cfg'
+      # official image plus only what Ansible and services need: python3 and systemd as PID 1
+      - name: Start test container
+        run: |
+          docker build -t test-image - <<EOF
+          FROM ${{ matrix.image }}
+          RUN apt-get update && apt-get install -y --no-install-recommends python3 systemd systemd-sysv && rm -rf /var/lib/apt/lists/*
+          CMD ["/lib/systemd/systemd"]
+          EOF
+          docker run -d --name test --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw test-image
 
-      - name: 'Install dependencies'
-        run: 'ansible-galaxy install phansible.php'
+      - name: Check the role/playbook's syntax
+        run: $PLAYBOOK --syntax-check
 
-      - name: 'Check the role/playbook''s syntax'
-        run: 'ansible-playbook -i tests/inventory tests/$PLAYBOOK --syntax-check'
+      - name: Run the role/playbook
+        run: $PLAYBOOK
 
-      - name: 'Run the role/playbook with ansible-playbook'
-        run: 'ansible-playbook -i tests/inventory tests/$PLAYBOOK --connection=local --become'
+      - name: Run the role/playbook again, checking to make sure it's idempotent
+        run: $PLAYBOOK | tee /dev/stderr | grep -q 'changed=0.*failed=0'
 
-      - name: 'Run the role/playbook again, checking to make sure it''s idempotent'
-        run: 'ansible-playbook -i tests/inventory tests/$PLAYBOOK --connection=local --become | grep -q ''changed=0.*failed=0'' && (echo ''Idempotence test: pass'' && exit 0) || (echo ''Idempotence test: fail'' && exit 1)'
+      # profiling needs real Blackfire credentials, so only check what is installed and loaded
+      - name: Check the Blackfire agent and probe are installed
+        run: |
+          docker exec test blackfire version
+          docker exec test dpkg -s blackfire-php
+
+      - name: Check the Blackfire extension is loaded
+        run: |
+          docker exec test php -m | grep -qx blackfire
+          docker exec test php-fpm${{ matrix.php }} -m | grep -qx blackfire
+
+      - name: Check php-fpm is running
+        run: docker exec test systemctl is-active php${{ matrix.php }}-fpm
